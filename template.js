@@ -20,7 +20,7 @@ var ARGS = '';
  * Run is the function you run to update your playlists
  */
 function run() {
-  /**  EXAMPLES
+  /*  EXAMPLES
   // Top Vivify - https://beatsaver.com/playlists/986760
   runwithArgs('986760', 5, "&vivify=true")
   // SmokeSync
