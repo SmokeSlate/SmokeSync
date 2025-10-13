@@ -53,21 +53,40 @@ white-space:pre-wrap;word-break:break-word;}
 let accessToken = null;
 let tokenClient = null;
 
-// Initialize token client after GIS script loads
 window.onload = () => {
+  // Create a visible Sign In button manually
+  const btn = document.createElement("button");
+  btn.textContent = "Sign in with Google";
+  btn.style.cssText = `
+    background:#4b8df8;color:#fff;padding:0.8em 1.2em;border:none;
+    border-radius:8px;font-size:1rem;cursor:pointer;`;
+  document.getElementById("signin").appendChild(btn);
+
+  // Initialize token client
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: "664531342070-ikpu8q50f0ok5ajg74l0b7jg03gaiqgd.apps.googleusercontent.com",
-    scope: "https://www.googleapis.com/auth/script.external_request https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/script.scriptapp https://www.googleapis.com/auth/userinfo.email",
+    scope: [
+      "https://www.googleapis.com/auth/script.external_request",
+      "https://www.googleapis.com/auth/script.projects",
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/script.scriptapp",
+      "https://www.googleapis.com/auth/userinfo.email"
+    ].join(" "),
     callback: (response) => {
-      accessToken = response.access_token;
-      document.getElementById("signin").style.display = "none";
-      document.getElementById("builderForm").style.display = "block";
+      if (response && response.access_token) {
+        accessToken = response.access_token;
+        document.getElementById("signin").style.display = "none";
+        document.getElementById("builderForm").style.display = "block";
+      } else {
+        document.getElementById("output").textContent = "Failed to retrieve token.";
+      }
     }
   });
 
-  document.getElementById("signin").onclick = () => {
-    tokenClient.requestAccessToken();
-  };
+  // Attach click handler to trigger OAuth consent
+  btn.addEventListener("click", () => {
+    tokenClient.requestAccessToken({ prompt: "consent" });
+  });
 };
 
 document.getElementById("builderForm").addEventListener("submit", async (e) => {
@@ -95,5 +114,6 @@ document.getElementById("builderForm").addEventListener("submit", async (e) => {
   }
 });
 </script>
+
 </body>
 </html>
