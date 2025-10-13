@@ -51,44 +51,26 @@ white-space:pre-wrap;word-break:break-word;}
 
 <script>
 let accessToken = null;
+let tokenClient = null;
 
-// Initialize Google Identity Services
+// Initialize token client after GIS script loads
 window.onload = () => {
-  google.accounts.id.initialize({
+  tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: "664531342070-ikpu8q50f0ok5ajg74l0b7jg03gaiqgd.apps.googleusercontent.com",
-    callback: handleCredentialResponse
+    scope: "https://www.googleapis.com/auth/script.external_request https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/script.scriptapp https://www.googleapis.com/auth/userinfo.email",
+    callback: (response) => {
+      accessToken = response.access_token;
+      document.getElementById("signin").style.display = "none";
+      document.getElementById("builderForm").style.display = "block";
+    }
   });
-  google.accounts.id.renderButton(
-    document.getElementById("signin"),
-    { theme: "outline", size: "large", text: "signin_with" }
-  );
+
+  document.getElementById("signin").onclick = () => {
+    tokenClient.requestAccessToken();
+  };
 };
 
-// Exchange ID token for OAuth2 access token
-async function handleCredentialResponse(response) {
-  document.getElementById("signin").innerText = "Signing in...";
-  const r = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {"Content-Type":"application/x-www-form-urlencoded"},
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-      subject_token: response.credential,
-      subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
-      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
-      audience: "https://script.google.com/"
-    })
-  });
-  const tok = await r.json();
-  accessToken = tok.access_token;
-  if(accessToken){
-    document.getElementById("signin").style.display="none";
-    document.getElementById("builderForm").style.display="block";
-  } else {
-    document.getElementById("signin").innerText="Sign-in failed.";
-  }
-}
-
-document.getElementById("builderForm").addEventListener("submit", async e => {
+document.getElementById("builderForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const url = scriptUrl.value.trim();
   const payload = {
@@ -97,16 +79,20 @@ document.getElementById("builderForm").addEventListener("submit", async e => {
     runs: JSON.parse(runs.value)
   };
   output.textContent = "Sending request...";
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type":"application/json",
-      "Authorization": "Bearer " + accessToken
-    },
-    body: JSON.stringify(payload)
-  });
-  const text = await res.text();
-  output.textContent = text;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + accessToken
+      },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    output.textContent = text;
+  } catch (err) {
+    output.textContent = "Error: " + err.message;
+  }
 });
 </script>
 </body>
