@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/assets/logo.png" alt="logo" height="300">
+  <img src="/assets/smokesync.png" alt="logo" height="300">
 </p>
 
 ---
