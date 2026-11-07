@@ -91,14 +91,21 @@ window.onload = () => {
 
 document.getElementById("builderForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const url = scriptUrl.value.trim();
-  const payload = {
-    username: username.value.trim(),
-    password: password.value.trim(),
-    runs: JSON.parse(runs.value)
-  };
-  output.textContent = "Sending request...";
+  output.textContent = '';
   try {
+    const url = scriptUrl.value.trim();
+    const parsedRuns = JSON.parse(runs.value);
+    if (!Array.isArray(parsedRuns) || !parsedRuns.length) throw new Error('Runs must be a nonempty JSON array.');
+    parsedRuns.forEach((run, index) => {
+      if (!run || typeof run !== 'object' || Array.isArray(run)
+          || !['string','number'].includes(typeof run.playlistID) || !String(run.playlistID).trim()
+          || !Number.isInteger(run.pages) || run.pages < 1
+          || (run.query !== undefined && typeof run.query !== 'string')) {
+        throw new Error(`Run ${index + 1} needs a playlistID, positive integer pages and optional string query.`);
+      }
+    });
+    const payload = { username: username.value.trim(), password: password.value, runs: parsedRuns };
+    output.textContent = "Sending request...";
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -107,6 +114,7 @@ document.getElementById("builderForm").addEventListener("submit", async (e) => {
       },
       body: JSON.stringify(payload)
     });
+    if (!res.ok) throw new Error(`Builder request failed (${res.status}).`);
     const text = await res.text();
     output.textContent = text;
   } catch (err) {

@@ -1,1 +1,220 @@
-var CONFIG={PLAYLIST_ID:"986760",BMSESSIONID:"",PAGES:5,QUERY:"",LEADERBOARD:"All",SORT_ORDER:"Rating",SLEEP_MS_BETWEEN_POSTS:20,SLEEP_MS_BETWEEN_PAGES:100};var BMSESSIONID="",PLAYLIST_INPUT=CONFIG.PLAYLIST_ID,BATCH_SIZE=1,BATCH_SLEEP_MS=5,RETRIES=3,RETRY_BASE_SLEEP_MS=1500,ARGS="";function run(){if(!PropertiesService.getScriptProperties().getProperty('password')){init()}SETRUN}function init(){PropertiesService.getScriptProperties().setProperty("username",SETNAME);PropertiesService.getScriptProperties().setProperty("password",SETPASS);saveSessionCookieFromSetCookie(loginAndGetCookie());try{ScriptApp.newTrigger("run").timeBased().everyDays(7).create()}catch(e){Logger.log("Trigger create error: "+e)}}function runwithArgs(e,t,n=""){CONFIG.BMSESSIONID=getValidSessionCookie().BMSESSIONID,BMSESSIONID=CONFIG.BMSESSIONID,CONFIG.PAGES=t,CONFIG.PLAYLIST_ID=e,PLAYLIST_INPUT=CONFIG.PLAYLIST_ID,ARGS=n,massRemoveFromPlaylist(),runSmokeSync()}function massRemoveFromPlaylist(){const e=parsePlaylistId(PLAYLIST_INPUT);if(!e)throw new Error("Could not parse playlist ID.");const t=fetchJson(`https://api.beatsaver.com/playlists/id/${e}`),n=getNested(t,["playlist","downloadURL"]);if(!n)throw new Error("No playlist.downloadURL.");const o=fetchJson(n),r=o?.songs||[];if(!Array.isArray(r)||!r.length)return Logger.log("No songs found.");Logger.log(`Removing ${r.length} songs...`);let s=0,a=0;for(let i=0;i<r.length;i++){const l=r[i]?.key;if(!l){a++;continue}postPlaylistToggle(e,l,!1)?s++:a++,i+1<r.length&&i% BATCH_SIZE==0&&Utilities.sleep(BATCH_SLEEP_MS)}Logger.log(`Done. OK:${s},Fail:${a}`)}function postPlaylistToggle(e,t,n){const o={method:"post",contentType:"application/json",payload:JSON.stringify({mapId:t,inPlaylist:!!n}),headers:{Cookie:`BMSESSIONID=${BMSESSIONID}`},muteHttpExceptions:!0};for(let r=0;r<=RETRIES;r++){const s=UrlFetchApp.fetch(`https://beatsaver.com/api/playlists/id/${e}/add`,o),a=s.getResponseCode();try{if(JSON.parse(s.getContentText()||"{}").success)return!0}catch{}if(!(a>=500||429==a)||r==RETRIES)return Logger.log(`FAIL ${t} ${a}`),!1;Utilities.sleep(RETRY_BASE_SLEEP_MS*Math.pow(2,r))}return!1}function parsePlaylistId(e){const t=String(e||"").trim();return/^\d+$/.test(t)?t:t.match(/playlists\/(\d+)/i)?.[1]||null}function fetchJson(e){const t=UrlFetchApp.fetch(e,{muteHttpExceptions:!0}),n=t.getResponseCode();if(n<200||n>=300)throw new Error(`GET ${e} ${n}`);return JSON.parse(t.getContentText())}function getNested(e,t){return t.reduce((e,t)=>e&&t in e?e[t]:void 0,e)}function runSmokeSync(){const e=[],t=[],n=[];for(let o=0;o<CONFIG.PAGES;o++){const r=fetchDocs(buildSearchUrl(o));for(const s of r){const a=String(s?.id||"").trim();if(!a)continue;const i=addToPlaylist(a);i.ok?e.push(a):409==i.status||400==i.status?t.push({a,reason:i.status}):n.push(i),Utilities.sleep(CONFIG.SLEEP_MS_BETWEEN_POSTS)}Utilities.sleep(CONFIG.SLEEP_MS_BETWEEN_PAGES)}Logger.log(JSON.stringify({added:e.length,skipped:t.length,failed:n.length}))}function buildSearchUrl(e){return`https://api.beatsaver.com/search/text/${e}?q=${encodeURIComponent(CONFIG.QUERY)}&leaderboard=${encodeURIComponent(CONFIG.LEADERBOARD)}&sortOrder=${encodeURIComponent(CONFIG.SORT_ORDER)}${ARGS}`}function fetchDocs(e){const t=UrlFetchApp.fetch(e,{muteHttpExceptions:!0});if(200!=t.getResponseCode())throw new Error(`Search fail ${t.getResponseCode()}`);const n=JSON.parse(t.getContentText()||"{}");return Array.isArray(n.docs)?n.docs:[]}function addToPlaylist(e){try{const t=UrlFetchApp.fetch(`https://beatsaver.com/api/playlists/id/${encodeURIComponent(CONFIG.PLAYLIST_ID)}/add`,{method:"post",contentType:"application/json",payload:JSON.stringify({mapId:e,inPlaylist:!0}),headers:{Cookie:`BMSESSIONID=${CONFIG.BMSESSIONID}`},muteHttpExceptions:!0}),n=t.getResponseCode();return{ok:n>=200&&n<300,status:n,body:t.getContentText()}}catch(t){return{ok:!1,status:-1,body:String(t)}}}function loginAndGetCookie(){const e=UrlFetchApp.fetch("https://beatsaver.com/login",{method:"post",payload:{username:PropertiesService.getScriptProperties().getProperty("username"),password:PropertiesService.getScriptProperties().getProperty("password")},followRedirects:!1,muteHttpExceptions:!0}),t=e.getAllHeaders()["Set-Cookie"],n=Array.isArray(t)?t:t?[t]:[];if(!n.length)throw new Error("No Set-Cookie header.");const o=n.find(e=>"string"==typeof e&&e.includes("BMSESSIONID="));if(!o)throw new Error("Missing BMSESSIONID.");return o}function parseSetCookie(e){const t={};return String(e).split(";").forEach(e=>{const n=e.trim();if(!n)return;const o=n.indexOf("=");o>-1?t[n.slice(0,o).trim()]=n.slice(o+1).trim():t[n]=!0}),t}function saveSessionCookieFromSetCookie(e){PropertiesService.getScriptProperties().setProperty("cookie",JSON.stringify(parseSetCookie(e)))}function loadSessionCookie(){const e=PropertiesService.getScriptProperties().getProperty("cookie");if(!e)throw new Error("No cookie.");return JSON.parse(e)}function getValidSessionCookie(){let e=loadSessionCookie(),t=e.Expires||e.expires;if(t){const n=new Date(t);if(!isNaN(n))if(new Date()>n){Logger.log("Cookie expired, refreshing..."),saveSessionCookieFromSetCookie(loginAndGetCookie()),e=loadSessionCookie()}else Logger.log("Cookie valid")}return e}
+var CONFIG = {
+  PLAYLIST_ID: "986760", BMSESSIONID: "", PAGES: 5, QUERY: "",
+  LEADERBOARD: "All", SORT_ORDER: "Rating",
+  SLEEP_MS_BETWEEN_POSTS: 20, SLEEP_MS_BETWEEN_PAGES: 100
+};
+var ARGS = "", RETRIES = 3, RETRY_BASE_SLEEP_MS = 1500;
+
+function run() {
+  const properties = PropertiesService.getScriptProperties();
+  if (!properties.getProperty('username') || !properties.getProperty('password')) init();
+  else getValidSessionCookie();
+  ensureWeeklyTrigger();
+  SETRUN
+}
+
+function ensureWeeklyTrigger() {
+  if (!ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === 'run')) {
+    ScriptApp.newTrigger('run').timeBased().everyDays(7).create();
+  }
+}
+
+function init() {
+  const username = SETNAME, password = SETPASS;
+  const cookie = parseSetCookie(loginAndGetCookie(username, password));
+  if (!cookie.BMSESSIONID) throw new Error('Login did not return a session cookie.');
+  // Failed login must not leave a password marker that skips initialization.
+  PropertiesService.getScriptProperties().setProperties({ username, password, cookie: JSON.stringify(cookie) });
+  ensureWeeklyTrigger();
+}
+
+function runwithArgs(input, pages, query = "") {
+  const playlistID = parsePlaylistId(input);
+  if (!playlistID) throw new Error('Could not parse playlist ID.');
+  if (!Number.isInteger(Number(pages)) || Number(pages) < 1) throw new Error('Pages must be a positive integer.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    CONFIG.BMSESSIONID = getValidSessionCookie().BMSESSIONID;
+    CONFIG.PLAYLIST_ID = playlistID;
+    CONFIG.PAGES = Number(pages);
+    ARGS = String(query || '');
+    return runSmokeSync();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function parsePlaylistId(input) {
+  const text = String(input || '').trim();
+  if (/^\d+$/.test(text)) return text;
+  return text.match(/^https?:\/\/(?:www\.)?beatsaver\.com\/playlists\/(\d+)(?:[/?#].*)?$/i)?.[1]
+    || text.match(/^https?:\/\/api\.beatsaver\.com\/playlists\/id\/(\d+)(?:[/?#].*)?$/i)?.[1]
+    || null;
+}
+
+function fetchJson(url) {
+  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) throw new Error(`GET request failed (${status}).`);
+  return JSON.parse(response.getContentText());
+}
+
+function getNested(value, fields) {
+  return fields.reduce((value, field) => value && field in value ? value[field] : undefined, value);
+}
+
+function readPlaylistSongs() {
+  const metadata = fetchJson(`https://api.beatsaver.com/playlists/id/${CONFIG.PLAYLIST_ID}`);
+  const download = getNested(metadata, ['playlist','downloadURL']);
+  if (!download) throw new Error('No playlist.downloadURL.');
+  const songs = fetchJson(download).songs;
+  if (!Array.isArray(songs) || songs.some(song => typeof song?.key !== 'string' || !song.key.trim())) {
+    throw new Error('Existing playlist returned malformed songs; no changes made.');
+  }
+  return [...new Set(songs.map(song => song.key.trim()))];
+}
+
+function runSmokeSync() {
+  // Discover and validate every page before any playlist mutation.
+  const desired = new Set();
+  for (let page = 0; page < CONFIG.PAGES; page++) {
+    for (const doc of fetchDocs(buildSearchUrl(page))) {
+      if (typeof doc?.id !== 'string' || !doc.id.trim()) throw new Error('Search returned an invalid map ID; no changes made.');
+      desired.add(doc.id.trim());
+    }
+    Utilities.sleep(CONFIG.SLEEP_MS_BETWEEN_PAGES);
+  }
+  if (!desired.size) throw new Error('No replacement maps found; existing playlist left unchanged.');
+  const existing = readPlaylistSongs();
+  const existingSet = new Set(existing);
+  const properties = PropertiesService.getScriptProperties();
+  const recoveryKey = `smokeSyncPending:${CONFIG.PLAYLIST_ID}`;
+  const prior = properties.getProperty(recoveryKey);
+  let before = existing;
+  if (prior) {
+    const recovery = JSON.parse(prior);
+    if (!Array.isArray(recovery.before)) throw new Error('Recovery state is invalid; no changes made.');
+    before = recovery.before;
+  }
+  // Saving recovery can fail on PropertiesService quotas. Do it before writes.
+  properties.setProperty(recoveryKey, JSON.stringify({ playlistID: CONFIG.PLAYLIST_ID, before, desired: [...desired] }));
+  let added = 0, removed = 0;
+  for (const mapId of desired) {
+    if (existingSet.has(mapId)) continue;
+    const result = addToPlaylist(mapId);
+    if (!result.ok) throw new Error(`Could not add ${mapId} (${result.status}); original songs retained. Recovery: ${recoveryKey}`);
+    added++;
+    Utilities.sleep(CONFIG.SLEEP_MS_BETWEEN_POSTS);
+  }
+  // Only remove obsolete songs after all replacement additions have succeeded.
+  for (const mapId of existing) {
+    if (desired.has(mapId)) continue;
+    if (!postPlaylistToggle(CONFIG.PLAYLIST_ID, mapId, false)) {
+      throw new Error(`Could not remove ${mapId}; replacement songs are present. Recovery: ${recoveryKey}`);
+    }
+    removed++;
+    Utilities.sleep(CONFIG.SLEEP_MS_BETWEEN_POSTS);
+  }
+  properties.deleteProperty(recoveryKey);
+  const summary = { added, removed, retained: existing.filter(id => desired.has(id)).length, failed: 0 };
+  Logger.log(JSON.stringify(summary));
+  return summary;
+}
+
+function buildSearchUrl(page) {
+  return `https://api.beatsaver.com/search/text/${page}?q=${encodeURIComponent(CONFIG.QUERY)}&leaderboard=${encodeURIComponent(CONFIG.LEADERBOARD)}&sortOrder=${encodeURIComponent(CONFIG.SORT_ORDER)}${ARGS}`;
+}
+
+function fetchDocs(url) {
+  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) throw new Error(`Search fail ${response.getResponseCode()}`);
+  const data = JSON.parse(response.getContentText() || '{}');
+  if (!Array.isArray(data.docs)) throw new Error('Search response has no docs array; no changes made.');
+  return data.docs;
+}
+
+function playlistMutation(playlistID, mapId, inPlaylist) {
+  const request = {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ mapId, inPlaylist: Boolean(inPlaylist) }),
+    headers: { Cookie: `BMSESSIONID=${CONFIG.BMSESSIONID}` }, muteHttpExceptions: true
+  };
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    let response;
+    try {
+      response = UrlFetchApp.fetch(`https://beatsaver.com/api/playlists/id/${encodeURIComponent(playlistID)}/add`, request);
+    } catch (error) {
+      return { ok: false, status: -1, body: String(error.message) };
+    }
+    const status = response.getResponseCode();
+    const body = String(response.getContentText() || '');
+    let success = false;
+    try { success = JSON.parse(body).success === true; } catch {}
+    if (status >= 200 && status < 300 && success) return { ok: true, status, body: body.slice(0,2000) };
+    if (!(status >= 500 || status === 429) || attempt === RETRIES) return { ok: false, status, body: body.slice(0,2000) };
+    Utilities.sleep(RETRY_BASE_SLEEP_MS * Math.pow(2, attempt));
+  }
+}
+
+function postPlaylistToggle(playlistID, mapId, inPlaylist) {
+  return playlistMutation(playlistID, mapId, inPlaylist).ok;
+}
+
+function addToPlaylist(mapId) {
+  return playlistMutation(CONFIG.PLAYLIST_ID, mapId, true);
+}
+
+function loginAndGetCookie(username, password) {
+  const properties = PropertiesService.getScriptProperties();
+  const response = UrlFetchApp.fetch('https://beatsaver.com/login', {
+    method: 'post', payload: {
+      username: username === undefined ? properties.getProperty('username') : username,
+      password: password === undefined ? properties.getProperty('password') : password
+    }, followRedirects: false, muteHttpExceptions: true
+  });
+  const header = response.getAllHeaders()['Set-Cookie'];
+  const cookies = Array.isArray(header) ? header : header ? [header] : [];
+  const cookie = cookies.find(value => typeof value === 'string' && value.includes('BMSESSIONID='));
+  if (!cookie) throw new Error('Login did not return BMSESSIONID.');
+  return cookie;
+}
+
+function parseSetCookie(header) {
+  const result = {};
+  String(header).split(';').forEach(part => {
+    const value = part.trim();
+    if (!value) return;
+    const separator = value.indexOf('=');
+    if (separator > -1) result[value.slice(0,separator).trim()] = value.slice(separator + 1).trim();
+    else result[value] = true;
+  });
+  return result;
+}
+
+function saveSessionCookieFromSetCookie(header) {
+  const cookie = parseSetCookie(header);
+  if (!cookie.BMSESSIONID) throw new Error('Missing session cookie.');
+  PropertiesService.getScriptProperties().setProperty('cookie', JSON.stringify(cookie));
+}
+
+function loadSessionCookie() {
+  const raw = PropertiesService.getScriptProperties().getProperty('cookie');
+  const cookie = raw ? JSON.parse(raw) : null;
+  if (!cookie || typeof cookie.BMSESSIONID !== 'string' || !cookie.BMSESSIONID) throw new Error('No valid cookie.');
+  return cookie;
+}
+
+function getValidSessionCookie() {
+  let cookie;
+  try {
+    cookie = loadSessionCookie();
+    const expiry = cookie.Expires || cookie.expires;
+    if (expiry && (Number.isNaN(Date.parse(expiry)) || Date.now() >= Date.parse(expiry))) cookie = null;
+  } catch { cookie = null; }
+  if (!cookie) {
+    saveSessionCookieFromSetCookie(loginAndGetCookie());
+    cookie = loadSessionCookie();
+  }
+  return cookie;
+}
